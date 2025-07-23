@@ -12,20 +12,37 @@ const WS_URL = `http://192.168.1.27:8081/ws`;
  * Connect to WebSocket server using SockJS and STOMP
  */
 export const connectWebSocket = (onReady: () => void) => {
+  // Disconnect existing connection if any
+  if (stompClient && stompClient.connected) {
+    stompClient.deactivate();
+  }
+  
   const socket = new SockJS(WS_URL);
   stompClient = new Client({
     webSocketFactory: () => socket,
     debug: (str) => logger.debug("WebSocket Debug", str),
     reconnectDelay: 5000,
+    heartbeatIncoming: 4000,
+    heartbeatOutgoing: 4000,
     onConnect: () => {
       logger.wsConnect(WS_URL);
       onReady(); // trigger subscriptions
     },
     onDisconnect: () => {
       logger.wsDisconnect(WS_URL);
+      // Attempt to reconnect after 3 seconds
+      setTimeout(() => {
+        if (stompClient && !stompClient.connected) {
+          logger.info("Attempting to reconnect WebSocket...");
+          stompClient.activate();
+        }
+      }, 3000);
     },
     onStompError: (frame) => {
       logger.wsError(frame);
+    },
+    onWebSocketError: (error) => {
+      logger.wsError(error);
     },
   });
 

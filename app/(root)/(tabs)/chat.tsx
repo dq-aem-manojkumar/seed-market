@@ -89,7 +89,14 @@ export default function ChatScreen() {
         }
       }
 
-      const chatUsers: ChatUser[] = Array.from(uniqueMap.values()).map(
+      const chatUsers: ChatUser[] = Array.from(uniqueMap.values())
+        .sort((a, b) => {
+          // Sort by lastMessageTime (newest first)
+          const timeA = new Date(a.lastMessageTime).getTime();
+          const timeB = new Date(b.lastMessageTime).getTime();
+          return timeB - timeA;
+        })
+        .map(
         (conv) => ({
           id: conv.partnerId,
           name: conv.partnerName,

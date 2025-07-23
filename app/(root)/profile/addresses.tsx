@@ -2,6 +2,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AnimatedCard from "@/app/components/ui/AnimatedCard";
+import { useDarkMode } from "@/app/context/DarkModeContext";
 
 const mockAddresses = [
   {
@@ -17,6 +18,7 @@ const mockAddresses = [
 ];
 
 export default function AddressesScreen() {
+  const { isDarkMode, toggleDarkMode, colors } = useDarkMode();
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -31,8 +33,10 @@ export default function AddressesScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <AnimatedCard style={styles.addressCard}>
-            <Text style={styles.addressLabel}>{item.label}</Text>
-            <Text style={styles.addressText}>{item.address}</Text>
+         
+            <Text style={[styles.addressLabel, { color: colors.text }]}>{item.label}  </Text>
+      
+            <Text style={[styles.addressText, { color: colors.text }]}>{item.address}</Text>
           </AnimatedCard>
         )}
       />

@@ -35,7 +35,11 @@ export default function ProfileScreen() {
   const notifications = useSelector(
     (state: RootState) => state.notifications.notifications
   );
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  
+  // Use the new notifications count selector for consistency
+  const newNotificationsCount = useSelector(
+    (state: RootState) => state.notifications.notifications.filter(n => !n.isRead).length
+  );
 
   useEffect(() => {
     fetchUserProfile();
@@ -485,7 +489,7 @@ export default function ProfileScreen() {
     {
       icon: <FontAwesome name="bell-o" size={20} color={colors.primary} />,
       label: "Notifications",
-      badge: unreadCount > 0 ? unreadCount : undefined,
+      badge: newNotificationsCount > 0 ? newNotificationsCount : undefined,
       onPress: () => router.push("/(root)/profile/notifications"),
     },
     {

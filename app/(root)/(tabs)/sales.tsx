@@ -33,7 +33,15 @@ export default function SalesScreen() {
 
   const receivedNotifications = response?.response ?? [];
   const [refreshing, setRefreshing] = React.useState(false);
-  const pendingRequests = receivedNotifications.filter(
+  
+  // Sort notifications by sendAt date (newest first)
+  const sortedNotifications = [...receivedNotifications].sort((a, b) => {
+    const dateA = new Date(a.requestNotificationDto?.sendAt || a.sendAt || 0).getTime();
+    const dateB = new Date(b.requestNotificationDto?.sendAt || b.sendAt || 0).getTime();
+    return dateB - dateA;
+  });
+  
+  const pendingRequests = sortedNotifications.filter(
     (item) => item.requestStatus === "PENDING"
   );
 
@@ -109,7 +117,7 @@ export default function SalesScreen() {
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.headerText }]}>
-                {receivedNotifications.length}
+                {sortedNotifications.length}
               </Text>
               <Text style={[styles.statLabel, { color: `${colors.headerText}CC` }]}>
                 Total
@@ -274,7 +282,7 @@ export default function SalesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={receivedNotifications}
+        data={sortedNotifications}
         keyExtractor={(item) => item.id.toString()}
         ListHeaderComponent={renderHeader}
         renderItem={renderRequestItem}

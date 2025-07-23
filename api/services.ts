@@ -10,6 +10,7 @@ import {
   NotificationStatus,
   Notification,
   ChatConversation,
+  ChatMessage,
 } from "./types";
 
 // ========== PRODUCTS ==========
@@ -247,6 +248,11 @@ export const markNotificationCleared = async (
   await api.patch(`/web/api/v1/notification/mark-cleared/${notificationId}`);
 };
 
+export const markNotificationAsClearedAll = async (): Promise<WebResponseDTO<string>> => {
+  const response = await api.patch("/web/api/v1/notification/mark-cleared-all");
+  return response.data;
+};
+
 export const getChatConversations = async (): Promise<ChatConversation[]> => {
   try {
     const res = await api.get<{ response: ChatConversation[] }>(
@@ -258,3 +264,21 @@ export const getChatConversations = async (): Promise<ChatConversation[]> => {
     return [];
   }
 };
+
+// Fetch specific message by messageId
+export const getMessageById = async (messageId: number): Promise<ChatMessage> => {
+  const res = await api.get<{ response: ChatMessage }>(
+    `/web/api/v1/chat/message/${messageId}`
+  );
+  return res.data?.response;
+};
+
+// Get full chat history with a partner
+export const getChatHistory = async (partnerId: string): Promise<ChatMessage[]> => {
+  const res = await api.get<{ response: ChatMessage[] }>(
+    `/web/api/v1/chat/history/${partnerId}`
+  );
+  return res.data?.response || [];
+};
+
+

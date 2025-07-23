@@ -6,7 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
+import { useDarkMode } from "@/app/context/DarkModeContext";
 
 function getString(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0];
@@ -14,6 +16,7 @@ function getString(value: string | string[] | undefined): string {
 }
 
 export default function OrderDetails() {
+  const { colors } = useDarkMode();
   const {
     productName,
     desiredQuantity,
@@ -29,35 +32,108 @@ export default function OrderDetails() {
   const formattedDate = sendAt
     ? new Date(getString(sendAt)).toLocaleDateString()
     : "N/A";
+  
+  const statusColor = 
+    getString(requestStatus) === "ACCEPTED" ? "#10B981" :
+    getString(requestStatus) === "REJECTED" ? "#EF4444" : "#F59E0B";
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push("/(root)/(tabs)/orders")}>
-          <Ionicons name="arrow-back" size={28} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Order Details</Text>
+      <View style={[styles.header, { backgroundColor: colors.headerBackground }]}>
+        <SafeAreaView>
+          <View style={styles.headerContent}>
+            <TouchableOpacity 
+              onPress={() => router.push("/(root)/(tabs)/orders")}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.headerText} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.headerText }]}>
+              Order Details
+            </Text>
+            <View style={{ width: 24 }} />
+          </View>
+        </SafeAreaView>
       </View>
 
-      <View style={styles.card}>
-        <Detail label="Product" value={getString(productName)} />
-        <Detail label="Quantity" value={`${quantity} kg`} />
-        <Detail label="Price" value={`₹${price}/kg`} />
-        <Detail label="Total" value={`₹${total.toFixed(2)}`} />
-        <Detail label="Status" value={getString(requestStatus)} />
-        <Detail label="Seller" value={getString(sellerName)} />
-        <Detail label="Ordered On" value={formattedDate} />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
+            Order Information
+          </Text>
+          
+          <Detail 
+            label="Product" 
+            value={getString(productName)} 
+            colors={colors}
+          />
+          <Detail 
+            label="Quantity" 
+            value={`${quantity} kg`} 
+            colors={colors}
+          />
+          <Detail 
+            label="Price per kg" 
+            value={`₹${price}`} 
+            colors={colors}
+          />
+          <Detail 
+            label="Total Amount" 
+            value={`₹${total.toFixed(2)}`} 
+            colors={colors}
+            isTotal={true}
+          />
+          <Detail 
+            label="Seller" 
+            value={getString(sellerName)} 
+            colors={colors}
+          />
+          <Detail 
+            label="Ordered On" 
+            value={formattedDate} 
+            colors={colors}
+          />
+          
+          <View style={styles.statusContainer}>
+            <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
+              Status
+            </Text>
+            <View style={[styles.statusBadge, { backgroundColor: `${statusColor}20` }]}>
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {getString(requestStatus)}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
       </View>
-    </ScrollView>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ 
+  label, 
+  value, 
+  colors, 
+  isTotal = false 
+}: { 
+  label: string; 
+  value: string; 
+  colors: any;
+  isTotal?: boolean;
+}) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+    <View style={[styles.detailRow, isTotal && styles.totalRow]}>
+      <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+        {label}
+      </Text>
+      <Text style={[
+        styles.detailValue, 
+        { color: isTotal ? colors.primary : colors.text },
+        isTotal && styles.totalValue
+      ]}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -65,42 +141,89 @@ function Detail({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
-    paddingHorizontal: 16,
-    paddingTop: 24,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 24,
+    paddingBottom: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginLeft: 12,
-    color: "#111827",
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    elevation: 3,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  row: {
-    marginBottom: 16,
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 20,
   },
-  label: {
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  totalRow: {
+    borderBottomWidth: 0,
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  detailLabel: {
     fontSize: 14,
-    color: "#6b7280",
-    marginBottom: 4,
+    fontWeight: "500",
   },
-  value: {
+  detailValue: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  statusContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textTransform: "capitalize",
   },
 });

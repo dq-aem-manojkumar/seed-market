@@ -148,6 +148,7 @@ export interface Notification {
   requestStatus?: NotificationStatus;
   desiredQuantity?: number;
   desiredPricePerKg?: number;
+  sendAt: string;
   requestNotificationDto: RequestNotificationModel;
 }
 //chat
@@ -164,15 +165,15 @@ export interface ChatMessage {
   productId: number;
 }
 
-export interface ChatUser {
-  id: string; // mapped from partnerId
-  name: string; // mapped from partnerName
-  profileImageUrl: string | null;
-  productId: number;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-}
+// export interface ChatUser {
+//   id: string; // mapped from partnerId
+//   name: string; // mapped from partnerName
+//   profileImageUrl: string | null;
+//   productId: number;
+//   lastMessage: string;
+//   lastMessageTime: string;
+//   unreadCount: number;
+// }
 
 export interface ChatConversation {
   partnerId: string;

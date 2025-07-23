@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSelector } from "react-redux";
 import MultiSlider from "@ptomasroos/react-native-multi-slider";
 
+import { selectNewNotificationsCount } from "@/store/notificationSlice";
 import useFetch from "@/hooks/useFetch";
 import { RootState } from "@/store";
 import ProductCard from "@/app/components/ProductCard";
@@ -46,7 +47,7 @@ export default function Home() {
   } = useFetch(() => getProducts(0, 50, filters.min, filters.max));
 
   const notifications = useSelector(
-    (state: RootState) => state.notifications.notifications
+    (state: RootState) => state.notifications.notifications.length
   );
 
   useFocusEffect(
@@ -156,10 +157,10 @@ export default function Home() {
                 size={32}
                 color={colors.headerText}
               />
-              {notifications.length > 0 && (
+              {notifications > 0 && (
                 <View style={[styles.badge, { backgroundColor: colors.badgeBackground }]}>
                   <Text style={[styles.badgeText, { color: colors.badgeText }]}>
-                    {notifications.length > 99 ? "99+" : notifications.length}
+                    {notifications > 99 ? "99+" : notifications}
                   </Text>
                 </View>
               )}

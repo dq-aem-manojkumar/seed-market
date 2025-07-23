@@ -1,8 +1,14 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import AnimatedCard from "@/app/components/ui/AnimatedCard";
+import { useDarkMode } from "@/app/context/DarkModeContext";
 
 const mockCards = [
   { id: "1", type: "Visa", last4: "4242", expiryMonth: "12", expiryYear: "26" },
@@ -16,15 +22,14 @@ const mockCards = [
 ];
 
 export default function PaymentScreen() {
+  const { isDarkMode, toggleDarkMode, colors } = useDarkMode();
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push("/(root)/(tabs)/profile")}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.title}>
-          Saved Cards
-        </Text>
+        <Text style={styles.title}>Saved Cards</Text>
       </View>
 
       <FlatList
@@ -32,10 +37,10 @@ export default function PaymentScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <AnimatedCard style={styles.cardItem}>
-            <Text style={styles.cardTitle}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
               {item.type} **** {item.last4}
             </Text>
-            <Text style={styles.cardExpiry}>
+            <Text style={[styles.cardExpiry, { color: colors.text }]}>
               Expiry: {item.expiryMonth}/{item.expiryYear}
             </Text>
           </AnimatedCard>

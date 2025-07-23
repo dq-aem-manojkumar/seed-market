@@ -13,8 +13,10 @@ import { getUser } from "@/api/services";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AnimatedCard from "@/app/components/ui/AnimatedCard";
+import { useDarkMode } from "@/app/context/DarkModeContext";
 
 export default function ViewProfileScreen() {
+
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,10 +88,13 @@ export default function ViewProfileScreen() {
 }
 
 function ProfileItem({ label, value }: { label: string; value: string }) {
+  const { isDarkMode, toggleDarkMode, colors } = useDarkMode();
   return (
     <View style={styles.infoItem}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+      {/* style={[styles.addressText, { color: colors.text }]} */}
+      {/* <Text style={styles.label}>{label}</Text> */}
+      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <Text style={[styles.value, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }

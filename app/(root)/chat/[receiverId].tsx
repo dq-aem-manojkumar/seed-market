@@ -65,21 +65,30 @@ export default function ChatDetailScreen() {
       if (userId && receiverId && productId) {
         await fetchChatHistory(receiverId, productId);
 
-        // Connect WebSocket
+        // Connect WebSocket with proper error handling
         connectWebSocket(() => {
           // Subscribe to this user's incoming messages
           subscribeChatToMessages(userId, (msg) => {
-            const received = JSON.parse(msg.body);
+            try {
+              const received = JSON.parse(msg.body);
 
-            // Filter messages based on receiver & product
-            if (
-              received.senderId === receiverId &&
-              received.productId === parseInt(productId)
-            ) {
-              setMessages((prev) => [...prev, received]);
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
+              // Filter messages based on receiver & product
+              if (
+                received.senderId === receiverId &&
+                received.productId === parseInt(productId)
+              ) {
+                setMessages((prev) => {
+                  // Avoid duplicate messages
+                  const exists = prev.some(m => m.id === received.id);
+                  if (exists) return prev;
+                  return [...prev, received];
+                });
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }
+            } catch (error) {
+              console.error("Error parsing WebSocket message:", error);
             }
           });
         });
