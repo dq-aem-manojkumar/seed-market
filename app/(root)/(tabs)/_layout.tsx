@@ -37,6 +37,7 @@ export default function TabsLayout() {
   const badges = useSelector(selectBadges);
   const newNotificationsCount = useSelector(selectNewNotificationsCount);
   const [userId, setUserId] = useState<string | null>(null);
+  const [wsInitialized, setWsInitialized] = useState(false);
 
   useEffect(() => {
     // Update notification badge when notifications change
@@ -56,11 +57,15 @@ export default function TabsLayout() {
 
   const setupWebSocket = async () => {
     const uid = await AsyncStorage.getItem("userId");
-    if (!uid) return;
+    if (!uid || wsInitialized) return;
+    
     setUserId(uid);
+    setWsInitialized(true);
     
     
     connectWebSocket(() => {
+      logger.info("WebSocket connected in TabsLayout");
+      
       subscribeToSeller(uid, (msg) => {
         try {
           const newNotif: Notification = JSON.parse(msg.body);
@@ -93,7 +98,11 @@ export default function TabsLayout() {
           // Create conversation ID
           const conversationId = `${chatMessage.senderId}-${chatMessage.receiverId}-${chatMessage.productId}`;
           dispatch(addMessage({ conversationId, message: chatMessage }));
-          dispatch(incrementBadge('chat'));
+          
+          // Only increment badge if message is not from current user
+          if (chatMessage.senderId !== uid) {
+            dispatch(incrementBadge('chat'));
+          }
         } catch (err) {
           logger.error("Chat message parse error", err);
         }
@@ -105,7 +114,10 @@ export default function TabsLayout() {
     fetchAllNotifications();
     setupWebSocket();
     
-    return () => disconnectWebSocket();
+    return () => {
+      // Don't disconnect WebSocket here as it's shared across screens
+      // disconnectWebSocket();
+    };
   }, []);
 
   const renderTabBarBadge = (count: number) => {

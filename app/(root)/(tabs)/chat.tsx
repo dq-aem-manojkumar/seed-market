@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,19 +7,26 @@ import {
   StyleSheet,
   Image,
   SafeAreaView,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useDispatch } from "react-redux";
-import { clearBadge } from "@/store/badgeSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { clearBadge, setBadgeCount } from "@/store/badgeSlice";
 import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
 import { useDarkMode } from "@/app/context/DarkModeContext";
 
 import { getAllUsers, getChatConversations } from "@/api/services";
 import { ChatConversation, UserModel } from "@/api/types";
+import { 
+  connectWebSocket, 
+  subscribeToMessages,
+  disconnectWebSocket 
+} from "@/api/websocket";
+import { addMessage } from "@/store/chatSlice";
+import { RootState } from "@/store";
 
 import LoadingSpinner from "@/app/components/ui/LoadingSpinner";
 import Input from "@/app/components/ui/Input";
@@ -32,20 +39,30 @@ interface ChatUser {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  productId?: number;
 }
 
 export default function ChatScreen() {
   const { colors } = useDarkMode();
   const dispatch = useDispatch();
+  const chatState = useSelector((state: RootState) => state.chat);
   const [users, setUsers] = useState<ChatUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<ChatUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const wsConnectedRef = useRef(false);
 
   useEffect(() => {
     fetchConversations();
     getCurrentUserId();
+    setupWebSocketConnection();
+    
+    return () => {
+      disconnectWebSocket();
+      wsConnectedRef.current = false;
+    };
   }, []);
 
   // Clear chat badge when screen is focused
@@ -54,6 +71,13 @@ export default function ChatScreen() {
       dispatch(clearBadge('chat'));
     }, [dispatch])
   );
+
+  // Update chat list when new messages arrive
+  useEffect(() => {
+    if (currentUserId) {
+      updateChatListFromRedux();
+    }
+  }, [chatState.conversations, currentUserId]);
 
   useEffect(() => {
     if (searchText.trim()) {
@@ -72,6 +96,70 @@ export default function ChatScreen() {
     const userId = await AsyncStorage.getItem("userId");
     setCurrentUserId(userId);
   };
+
+  const setupWebSocketConnection = async () => {
+    const userId = await AsyncStorage.getItem("userId");
+    if (!userId || wsConnectedRef.current) return;
+
+    try {
+      connectWebSocket(() => {
+        wsConnectedRef.current = true;
+        console.log('WebSocket connected for chat list');
+        
+        // Subscribe to incoming messages
+        subscribeToMessages(userId, (msg) => {
+          try {
+            const chatMessage = JSON.parse(msg.body);
+            console.log('New message received in chat list:', chatMessage);
+            
+            // Create conversation ID
+            const conversationId = `${chatMessage.senderId}-${chatMessage.receiverId}-${chatMessage.productId}`;
+            dispatch(addMessage({ conversationId, message: chatMessage }));
+            
+            // Refresh conversations to update last message
+            fetchConversations();
+          } catch (error) {
+            console.error('Error parsing WebSocket message in chat list:', error);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Failed to setup WebSocket connection:', error);
+      // Retry connection after 3 seconds
+      setTimeout(() => {
+        if (!wsConnectedRef.current) {
+          setupWebSocketConnection();
+        }
+      }, 3000);
+    }
+  };
+
+  const updateChatListFromRedux = () => {
+    if (!currentUserId) return;
+    
+    // Update users list with latest messages from Redux
+    setUsers(prevUsers => {
+      return prevUsers.map(user => {
+        // Find latest message for this user
+        const conversationId = `${user.id}-${currentUserId}-${user.productId || 1}`;
+        const messages = chatState.conversations[conversationId] || [];
+        
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          return {
+            ...user,
+            lastMessage: latestMessage.content,
+            lastMessageTime: new Date(latestMessage.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          };
+        }
+        return user;
+      });
+    });
+  };
+
   const fetchConversations = async () => {
     try {
       setLoading(true);
@@ -89,14 +177,7 @@ export default function ChatScreen() {
         }
       }
 
-      const chatUsers: ChatUser[] = Array.from(uniqueMap.values())
-        .sort((a, b) => {
-          // Sort by lastMessageTime (newest first)
-          const timeA = new Date(a.lastMessageTime).getTime();
-          const timeB = new Date(b.lastMessageTime).getTime();
-          return timeB - timeA;
-        })
-        .map(
+      const chatUsers: ChatUser[] = Array.from(uniqueMap.values()).map(
         (conv) => ({
           id: conv.partnerId,
           name: conv.partnerName,
@@ -110,8 +191,16 @@ export default function ChatScreen() {
             }
           ),
           unreadCount: Math.floor(Math.random() * 3), // simulated
+          productId: conv.productId,
         })
       );
+
+      // Sort by lastMessageTime (newest first)
+      chatUsers.sort((a, b) => {
+        const timeA = new Date(a.lastMessageTime).getTime();
+        const timeB = new Date(b.lastMessageTime).getTime();
+        return timeB - timeA;
+      });
 
       setUsers(chatUsers);
     } catch (err) {
@@ -121,13 +210,32 @@ export default function ChatScreen() {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchConversations();
+    setRefreshing(false);
+  }, []);
+
   const handleChatPress = (user: ChatUser) => {
+    // Clear unread count for this user
+    setUsers(prevUsers => 
+      prevUsers.map(u => 
+        u.id === user.id ? { ...u, unreadCount: 0 } : u
+      )
+    );
+    
+    // Update badge count
+    const totalUnread = users.reduce((sum, u) => 
+      sum + (u.id === user.id ? 0 : u.unreadCount), 0
+    );
+    dispatch(setBadgeCount({ type: 'chat', count: totalUnread }));
+    
     router.push({
       pathname: "/(root)/chat/[receiverId]",
       params: {
         receiverId: user.id!,
         receiverName: user.name,
-        productId: "1", // Default product ID, should be dynamic in real app
+        productId: user.productId?.toString() || "1",
       },
     });
   };
@@ -216,7 +324,7 @@ export default function ChatScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={filteredUsers}
-        keyExtractor={(item) => item.id!}
+        keyExtractor={(item) => `${item.id}-${item.productId || 1}`}
         ListHeaderComponent={
           <>
             {renderHeader()}
@@ -234,6 +342,9 @@ export default function ChatScreen() {
         renderItem={renderChatItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <AnimatedCard style={styles.emptyCard}>
             <View style={styles.emptyContent}>

@@ -25,6 +25,14 @@ const AnimatedCard: React.FC<AnimatedCardProps> = ({
       marginVertical: 8,
     },
   });
-  return <View style={[cardStyle.card, style]}>{children}</View>;
+  // Ensure children is properly wrapped
+  const renderChildren = () => {
+    if (typeof children === 'string') {
+      console.warn('AnimatedCard: String children should be wrapped in <Text> component');
+      return children;
+    }
+    return children;
+  };
+  return <View style={[cardStyle.card, style]}>{renderChildren()}</View>;
 };
 export default AnimatedCard;

@@ -28,6 +28,7 @@ import {
   connectWebSocket,
   sendChatMessage,
   subscribeChatToMessages,
+  disconnectWebSocket,
 } from "@/api/websocket";
 
 export default function ChatDetailScreen() {
@@ -44,10 +45,19 @@ export default function ChatDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     initializeChat();
+    
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      // Don't disconnect here as other screens might be using it
+    };
   }, []);
 
   // Clear chat badge when entering specific chat
@@ -100,6 +110,58 @@ export default function ChatDetailScreen() {
     }
   };
 
+  const setupWebSocketConnection = async (userId: string) => {
+    try {
+      connectWebSocket(() => {
+        setWsConnected(true);
+        console.log('WebSocket connected for chat detail');
+        
+        // Subscribe to this user's incoming messages
+        subscribeChatToMessages(userId, (msg) => {
+          try {
+            const received = JSON.parse(msg.body);
+            console.log('Message received in chat detail:', received);
+
+            // Filter messages based on receiver & product
+            if (
+              received.senderId === receiverId &&
+              received.productId === parseInt(productId)
+            ) {
+              setMessages((prev) => {
+                // Avoid duplicate messages
+                const exists = prev.some(m => 
+                  m.id === received.id || 
+                  (m.content === received.content && 
+                   Math.abs(new Date(m.timestamp).getTime() - new Date(received.timestamp).getTime()) < 1000)
+                );
+                if (exists) return prev;
+                
+                const updated = [...prev, received].sort(
+                  (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                );
+                return updated;
+              });
+              
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }
+          } catch (error) {
+            console.error("Error parsing WebSocket message:", error);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Failed to setup WebSocket:', error);
+      setWsConnected(false);
+      
+      // Retry connection after 3 seconds
+      reconnectTimeoutRef.current = setTimeout(() => {
+        console.log('Retrying WebSocket connection...');
+        setupWebSocketConnection(userId);
+      }, 3000);
+    }
+  };
   const fetchChatHistory = async (partnerId: string, prodId: string) => {
     try {
       const history = await getChatHistory(partnerId);
@@ -148,6 +210,10 @@ export default function ChatDetailScreen() {
     }, 100);
 
     try {
+      if (!wsConnected) {
+        throw new Error('WebSocket not connected');
+      }
+      
       await sendChatMessage({
         senderId: message.senderId,
         receiverId: message.receiverId,
@@ -160,6 +226,11 @@ export default function ChatDetailScreen() {
       // Remove message from local state if sending failed
       setMessages((prev) => prev.filter((msg) => msg.id !== message.id));
       alert("Failed to send message. Please try again.");
+      
+      // Try to reconnect WebSocket
+      if (currentUserId) {
+        setupWebSocketConnection(currentUserId);
+      }
     } finally {
       setSending(false);
     }
@@ -254,7 +325,7 @@ export default function ChatDetailScreen() {
               {receiverName}
             </Text>
             <Text style={[styles.headerStatus, { color: `${colors.headerText}CC` }]}>
-              Online
+              {wsConnected ? "Online" : "Connecting..."}
             </Text>
           </View>
         </View>
@@ -285,7 +356,7 @@ export default function ChatDetailScreen() {
           style={[
             styles.sendButton,
             { backgroundColor: colors.primary },
-            (!newMessage.trim() || sending) && styles.sendButtonDisabled,
+            (!newMessage.trim() || sending || !wsConnected) && styles.sendButtonDisabled,
           ]}
         >
           {sending ? (
